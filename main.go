@@ -9,19 +9,27 @@ import (
 	"time"
 )
 
+func BOM() []byte {
+	return []byte{0xEF, 0xBB, 0xBF}
+}
+
 func main() {
 	err := record.LoopRecordFile(".", func(path string) error {
 		csvPath := path[0:len(path)-4] + ".csv"
 		fmt.Println(csvPath)
 		file, err := os.Create(csvPath)
-		// todo write danmu to csv
 		if err != nil {
 			return exceptions.Package(err)
 		}
-		defer file.Close()
+		defer func(file *os.File) {
+			err = file.Close()
+			if err != nil {
+				exceptions.Print(err)
+			}
+		}(file)
 
 		// write utf8 BOM
-		_, err = file.Write([]byte{0xEF, 0xBB, 0xBF})
+		_, err = file.Write(BOM())
 		if err != nil {
 			return exceptions.Package(err)
 		}
