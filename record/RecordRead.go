@@ -15,7 +15,9 @@ func ReadRecord(path string, callback func(record *RecordMsg) error) error {
 	if err != nil {
 		return exceptions.Package(err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		exceptions.Print(file.Close())
+	}(file)
 
 	gzReader, err := gzip.NewReader(file)
 	if err != nil {
@@ -29,11 +31,17 @@ func ReadRecord(path string, callback func(record *RecordMsg) error) error {
 	}
 
 	for read == 4 {
-		size := binary.BigEndian.Uint32(sizeBuffer)
+		var size = binary.BigEndian.Uint32(sizeBuffer)
 		buffer := make([]byte, size)
-		read, err = gzReader.Read(buffer)
-		if err != nil && err != io.EOF {
-			return exceptions.Package(err)
+		for size != 0 {
+			gzRead, err := gzReader.Read(buffer[len(buffer)-int(size):])
+			if err != nil && err != io.EOF {
+				return exceptions.Package(err)
+			}
+			size -= uint32(gzRead)
+			if err == io.EOF && size != 0 {
+				return exceptions.Package(err)
+			}
 		}
 
 		recordMsg := &RecordMsg{}
@@ -72,5 +80,5 @@ func LoopRecordFile(path string, callback func(path string) error) error {
 			return exceptions.Package(err)
 		}
 	}
-	return exceptions.Package(err)
+	return nil
 }
